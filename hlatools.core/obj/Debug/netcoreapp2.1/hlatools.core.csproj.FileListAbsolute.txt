@@ -1,0 +1,8 @@
+C:\wrk\src\hlatools\hlatools.core\obj\Debug\netcoreapp2.1\hlatools.core.csproj.CoreCompileInputs.cache
+C:\wrk\src\hlatools\hlatools.core\obj\Debug\netcoreapp2.1\hlatools.core.AssemblyInfoInputs.cache
+C:\wrk\src\hlatools\hlatools.core\obj\Debug\netcoreapp2.1\hlatools.core.AssemblyInfo.cs
+C:\wrk\src\hlatools\bin\netcoreapp2.1\hlatools.core.deps.json
+C:\wrk\src\hlatools\bin\netcoreapp2.1\hlatools.core.dll
+C:\wrk\src\hlatools\bin\netcoreapp2.1\hlatools.core.pdb
+C:\wrk\src\hlatools\hlatools.core\obj\Debug\netcoreapp2.1\hlatools.core.dll
+C:\wrk\src\hlatools\hlatools.core\obj\Debug\netcoreapp2.1\hlatools.core.pdb

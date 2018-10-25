@@ -1,0 +1,12 @@
+C:\wrk\src\hlatools\hlatools\obj\Debug\netcoreapp2.1\hlatools.csprojAssemblyReference.cache
+C:\wrk\src\hlatools\hlatools\obj\Debug\netcoreapp2.1\hlatools.csproj.CoreCompileInputs.cache
+C:\wrk\src\hlatools\hlatools\obj\Debug\netcoreapp2.1\hlatools.AssemblyInfoInputs.cache
+C:\wrk\src\hlatools\hlatools\obj\Debug\netcoreapp2.1\hlatools.AssemblyInfo.cs
+C:\wrk\src\hlatools\bin\netcoreapp2.1\hlatools.deps.json
+C:\wrk\src\hlatools\bin\netcoreapp2.1\hlatools.runtimeconfig.json
+C:\wrk\src\hlatools\bin\netcoreapp2.1\hlatools.runtimeconfig.dev.json
+C:\wrk\src\hlatools\bin\netcoreapp2.1\hlatools.dll
+C:\wrk\src\hlatools\bin\netcoreapp2.1\hlatools.pdb
+C:\wrk\src\hlatools\hlatools\obj\Debug\netcoreapp2.1\hlatools.csproj.CopyComplete
+C:\wrk\src\hlatools\hlatools\obj\Debug\netcoreapp2.1\hlatools.dll
+C:\wrk\src\hlatools\hlatools\obj\Debug\netcoreapp2.1\hlatools.pdb
