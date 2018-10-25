@@ -6,3 +6,4 @@ C:\wrk\src\hlatools\bin\netcoreapp2.1\hlatools.core.dll
 C:\wrk\src\hlatools\bin\netcoreapp2.1\hlatools.core.pdb
 C:\wrk\src\hlatools\hlatools.core\obj\Debug\netcoreapp2.1\hlatools.core.dll
 C:\wrk\src\hlatools\hlatools.core\obj\Debug\netcoreapp2.1\hlatools.core.pdb
+C:\wrk\src\hlatools\hlatools.core\obj\Debug\netcoreapp2.1\hlatools.core.csprojAssemblyReference.cache
