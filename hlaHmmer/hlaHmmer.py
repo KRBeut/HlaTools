@@ -3,6 +3,7 @@ import os
 import os.path
 import sys
 import subprocess
+from subprocess import call
 
 def file_path(string):
     if os.path.exists(string):
@@ -16,7 +17,20 @@ def dir_path(string):
     else:
         raise NotADirectoryError(string)
 
+#def cmd2Subproc(cmdStr,stdIn=None,stdOut=None,stdErr=None):
+#    toks = [x.strip() for x in cmdStr.split('|')]
+#    p = None
+#    for cmd in toks:
+#        cmdToks = cmd.split()
+#        if not p:
+#            p = subprocess.Popen(cmdToks,stdin=stdIn,stdout=subprocess.PIPE)                
+#        else:
+#            p = subprocess.Popen(cmdToks,stdin=p.stdout, stdout=subprocess.PIPE)
+#    p.stdout = stdOut
+#    return p
+
 def filepath2Pipe(filepath):
+    pipeline = []
     ext = os.path.splitext(filepath)[1]
     if ext == '.bam':
         return ['samtools fasta -F 0x900 {0} | '.format(filepath)]
@@ -46,10 +60,11 @@ def nhmmer(readFiles,hmmFiles,workDir,hmmerOpts):
             hmmerGoiAlignments.append(outFilepath)
             cmd = '{0}{1}'.format(fa,hmmerCmdTemplate.format(outFilepath,hmmerOpts,hmmFilepath))
             print(cmd)
-            #os.system(cmd);
+            subprocess.call(cmd);
     return hmmerGoiAlignments
 
 def main():
+    
     parser = argparse.ArgumentParser()
     parser.add_argument("-g", "--gois", type=str, nargs='+', help=".hmm filepaths of genes to map onto", action="store", required=True)
     parser.add_argument("-d", "--decoys", type=str, nargs='+', help=".hmm filepath of genes that are homologous to one or more goi", action="store", default=[])
@@ -99,22 +114,22 @@ def main():
     goiFaFilepath = os.path.join(args.workDir, 'goi.fa.gz')
     cmd = 'dotnet hlatools hmmerConvert -f fa -c on -o {0} -i {1}'.format(goiFaFilepath,' '.join(hmmerGoiAlignments))
     print(cmd)
-    #os.system(cmd);
+    subprocess.call(cmd);
 
-    #map the reads in goi.fa onto the decoys
+    #map the reads in goi.fa.gz onto the decoys
     hmmerDecoyAlignments = nhmmer(goiFaFilepath, args.decoys, args.workDir, hmmerOpts)
 
     #output the final bam file
     cmd = 'dotnet hlatools hmmerConvert -f sam -c off -i {0} | samtools view -Sb - | samtools sort - {1}'.format(' '.join(hmmerGoiAlignments + hmmerDecoyAlignments),args.out)
     print(cmd)
-    #os.system(cmd);
+    subprocess.call(cmd);
         
     #clean-up intermediate files
-    #os.remove(goiFaFilepath)
-    #for f in hmmerGoiAlignments:
-    #    os.remove(f)
-    #for f in hmmerDecoyAlignments:
-    #    os.remove(f)
+    os.remove(goiFaFilepath)
+    for f in hmmerGoiAlignments:
+        os.remove(f)
+    for f in hmmerDecoyAlignments:
+        os.remove(f)
 
 if __name__ == '__main__':
     main()
