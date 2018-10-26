@@ -112,8 +112,7 @@ def main():
         raise ValueError('No input reads were given to map! Please use (--fq1,fq2), --fq, or --bam')
     
     #map the reads onto the hmm from each gene of interest
-    #hmmerGoiAlignments = nhmmer(readFiles, args.gois, args.workDir, hmmerOpts, args.nhmmerPath)
-    hmmerGoiAlignments = ['/media/kbeutner/data/tesla/roundX/unlock_data/P4HlaMapping/A_gen.txt','/media/kbeutner/data/tesla/roundX/unlock_data/P4HlaMapping/B_gen.txt','/media/kbeutner/data/tesla/roundX/unlock_data/P4HlaMapping/C_gen.txt'];
+    hmmerGoiAlignments = nhmmer(readFiles, args.gois, args.workDir, hmmerOpts, args.nhmmerPath)
 
     #build a new, smaller, fa file with only the reads that mapped onto one or more goi
     goiFaFilepath = os.path.join(args.workDir, 'goi.fa.gz')
@@ -125,16 +124,16 @@ def main():
     hmmerDecoyAlignments = nhmmer(goiFaFilepath, args.decoys, args.workDir, hmmerOpts, args.nhmmerPath)
     
     #output the final bam file
-    cmd = 'dotnet hlatools hmmerConvert -f sam -c off -i {0} | samtools view -Sb - | samtools sort - -o {1}'.format(' '.join(hmmerGoiAlignments + hmmerDecoyAlignments),args.out)
+    cmd = 'dotnet {0} hmmerConvert -f sam -c off -i {1} | samtools view -Sb - | samtools sort - -o {2}'.format(args.hlatoolsPath, ' '.join(hmmerGoiAlignments + hmmerDecoyAlignments),args.out)
     print(cmd)
     subprocess.call(cmd, shell=True);
         
     #clean-up intermediate files
-    os.remove(goiFaFilepath)
-    for f in hmmerGoiAlignments:
-        os.remove(f)
-    for f in hmmerDecoyAlignments:
-        os.remove(f)
+    #os.remove(goiFaFilepath)
+    #for f in hmmerGoiAlignments:
+    #    os.remove(f)
+    #for f in hmmerDecoyAlignments:
+    #    os.remove(f)
 
 if __name__ == '__main__':
     main()
