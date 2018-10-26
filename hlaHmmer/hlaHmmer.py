@@ -3,6 +3,7 @@ import os
 import os.path
 import sys
 import subprocess
+import shlex
 from subprocess import call
 
 def file_path(string):
@@ -56,11 +57,11 @@ def nhmmer(readFiles,hmmFiles,workDir,hmmerOpts):
     for fa in faPipes:
         k=k+1
         for hmmFilepath in hmmFiles:
-            outFilepath = os.path.join(workDir,'{0}{1}.txt'.format(os.path.splitext(hmmFilepath)[0],'_{0}'.format(k) if multiFaPipes else ''))
+            outFilepath = os.path.join(workDir,'{0}{1}.txt'.format(os.path.splitext(hmmFilepath)[0],'{0}'.format(('_'+k) if multiFaPipes else '')))
             hmmerGoiAlignments.append(outFilepath)
             cmd = '{0}{1}'.format(fa,hmmerCmdTemplate.format(outFilepath,hmmerOpts,hmmFilepath))
             print(cmd)
-            subprocess.call(cmd);
+            subprocess.call(cmd, shell=True);
     return hmmerGoiAlignments
 
 def main():
@@ -114,7 +115,7 @@ def main():
     goiFaFilepath = os.path.join(args.workDir, 'goi.fa.gz')
     cmd = 'dotnet hlatools hmmerConvert -f fa -c on -o {0} -i {1}'.format(goiFaFilepath,' '.join(hmmerGoiAlignments))
     print(cmd)
-    subprocess.call(cmd);
+    subprocess.call(cmd, shell=True);
 
     #map the reads in goi.fa.gz onto the decoys
     hmmerDecoyAlignments = nhmmer(goiFaFilepath, args.decoys, args.workDir, hmmerOpts)
@@ -122,7 +123,7 @@ def main():
     #output the final bam file
     cmd = 'dotnet hlatools hmmerConvert -f sam -c off -i {0} | samtools view -Sb - | samtools sort - {1}'.format(' '.join(hmmerGoiAlignments + hmmerDecoyAlignments),args.out)
     print(cmd)
-    subprocess.call(cmd);
+    subprocess.call(cmd, shell=True);
         
     #clean-up intermediate files
     os.remove(goiFaFilepath)
