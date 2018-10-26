@@ -9,13 +9,13 @@ def file_path(string):
     if os.path.exists(string):
         return string
     else:
-        raise NotADirectoryError(string)
+        raise ValueError(string)
 
 def dir_path(string):
     if os.path.isdir(string):
         return string
     else:
-        raise NotADirectoryError(string)
+        raise ValueError(string)
 
 #def cmd2Subproc(cmdStr,stdIn=None,stdOut=None,stdErr=None):
 #    toks = [x.strip() for x in cmdStr.split('|')]
