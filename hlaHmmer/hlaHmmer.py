@@ -111,20 +111,18 @@ def main():
     else:
         raise ValueError('No input reads were given to map! Please use (--fq1,fq2), --fq, or --bam')
     
-    ##map the reads onto the hmm from each gene of interest
-    #hmmerGoiAlignments = nhmmer(readFiles, args.gois, args.workDir, hmmerOpts, args.nhmmerPath)
-    #
-    ##build a new, smaller, fa file with only the reads that mapped onto one or more goi
-    #goiFaFilepath = os.path.join(args.workDir, 'goi.fa.gz')
-    #cmd = 'dotnet {0} hmmerConvert -f fa -c on -o {1} -i {2}'.format(args.hlatoolsPath, goiFaFilepath,' '.join(hmmerGoiAlignments))
-    #print(cmd)
-    #subprocess.call(cmd, shell=True);
-    #
-    ##map the reads in goi.fa.gz onto the decoys
-    #hmmerDecoyAlignments = nhmmer(goiFaFilepath, args.decoys, args.workDir, hmmerOpts, args.nhmmerPath)
+    #map the reads onto the hmm from each gene of interest
+    hmmerGoiAlignments = nhmmer(readFiles, args.gois, args.workDir, hmmerOpts, args.nhmmerPath)
     
-    hmmerGoiAlignments = ['/media/kbeutner/data/tesla/roundX/unlock_data/P4HlaMapping/A_gen.txt','/media/kbeutner/data/tesla/roundX/unlock_data/P4HlaMapping/B_gen.txt','/media/kbeutner/data/tesla/roundX/unlock_data/P4HlaMapping/C_gen.txt']
-    hmmerDecoyAlignments = ['/media/kbeutner/data/tesla/roundX/unlock_data/P4HlaMapping/E_gen.txt','/media/kbeutner/data/tesla/roundX/unlock_data/P4HlaMapping/F_gen.txt','/media/kbeutner/data/tesla/roundX/unlock_data/P4HlaMapping/G_gen.txt','/media/kbeutner/data/tesla/roundX/unlock_data/P4HlaMapping/H_gen.txt','/media/kbeutner/data/tesla/roundX/unlock_data/P4HlaMapping/J_gen.txt','/media/kbeutner/data/tesla/roundX/unlock_data/P4HlaMapping/K_gen.txt','/media/kbeutner/data/tesla/roundX/unlock_data/P4HlaMapping/L_gen.txt','/media/kbeutner/data/tesla/roundX/unlock_data/P4HlaMapping/MICA_gen.txt','/media/kbeutner/data/tesla/roundX/unlock_data/P4HlaMapping/MICB_gen.txt','/media/kbeutner/data/tesla/roundX/unlock_data/P4HlaMapping/P_gen.txt','/media/kbeutner/data/tesla/roundX/unlock_data/P4HlaMapping/T_gen.txt','/media/kbeutner/data/tesla/roundX/unlock_data/P4HlaMapping/U_gen.txt','/media/kbeutner/data/tesla/roundX/unlock_data/P4HlaMapping/V_gen.txt','/media/kbeutner/data/tesla/roundX/unlock_data/P4HlaMapping/W_gen.txt','/media/kbeutner/data/tesla/roundX/unlock_data/P4HlaMapping/Y_gen.txt']
+    #build a new, smaller, fa file with only the reads that mapped onto one or more goi
+    goiFaFilepath = os.path.join(args.workDir, 'goi.fa.gz')
+    cmd = 'dotnet {0} hmmerConvert -f fa -c on -o {1} -i {2}'.format(args.hlatoolsPath, goiFaFilepath,' '.join(hmmerGoiAlignments))
+    print(cmd)
+    subprocess.call(cmd, shell=True);
+    
+    #map the reads in goi.fa.gz onto the decoys
+    hmmerDecoyAlignments = nhmmer(goiFaFilepath, args.decoys, args.workDir, hmmerOpts, args.nhmmerPath)
+    
     #output the final bam file (sorted by read name)
     #cmd = 'dotnet {0} hmmerConvert -f sam -c off -i {1} | samtools view -Sb - | samtools sort - -o {2}'.format(args.hlatoolsPath, ' '.join(hmmerGoiAlignments + hmmerDecoyAlignments),args.out)
     cmd = 'dotnet {0} hmmerConvert -f sam -c off -i {1} | samtools sort -n -O bam -o {2} -'.format(args.hlatoolsPath, ' '.join(hmmerGoiAlignments + hmmerDecoyAlignments),args.out)
