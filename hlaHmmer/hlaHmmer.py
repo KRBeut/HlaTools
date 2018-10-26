@@ -33,7 +33,7 @@ def filepath2Pipe(filepath):
     pipeline = []
     ext = os.path.splitext(filepath)[1]
     if ext == '.bam':
-        return ['samtools fasta -F 0x900 {0} | '.format(filepath)]
+        return 'samtools fasta -F 0x900 {0} | '.format(filepath)
     else:
         if ext == '.gz':
             faPipes = 'gzip -cdk {0} | '.format(filepath)
@@ -75,7 +75,7 @@ def main():
     parser.add_argument("-b", "--bam", type=str, help="path to input bam", action="store")
     parser.add_argument("-o", "--out", help="path to output bam", action="store", type=str)
     parser.add_argument("-p", "--hmmerOpts", nargs='+', help="hmmer options", action="store", type=str, default=['--notextw','--nonull2','--nobias','--dna','--tformat fasta'])
-    parser.add_argument("-w", "--workDir", type=dir_path, help="path to dir where intermediate files can be written", action="store", default=os.getcwd())
+    parser.add_argument("-w", "--workDir", type=str, help="path to dir where intermediate files can be written", action="store", default=os.getcwd())
     args = parser.parse_args()
 
     
