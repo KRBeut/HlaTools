@@ -45,13 +45,13 @@ def filepath2Pipe(filepath):
             faPipes = faPipes+'awk \'{if(NR%4==1) {split(substr($0,2),a," "); printf(">%s_2\\n",a[1]);} else if(NR%4==2) print;}\' | '        
         return faPipes
 
-def nhmmer(readFiles,hmmFiles,workDir,hmmerOpts):
+def nhmmer(readFiles,hmmFiles,workDir,hmmerOpts,nhmmerPath = 'nhmmer'):
     if isinstance(readFiles,str):
         readFiles = [readFiles]
     
     k = 0
     faPipes = [filepath2Pipe(x) for x in set(readFiles)]
-    hmmerCmdTemplate = 'nhmmer -o {0} {1} {2} -';
+    hmmerCmdTemplate = nhmmerPath+' -o {0} {1} {2} -';
     multiFaPipes = len(faPipes) > 1
     hmmerGoiAlignments = []
     for fa in faPipes:
@@ -78,6 +78,8 @@ def main():
     parser.add_argument("-o", "--out", help="path to output bam", action="store", type=str)
     parser.add_argument("-p", "--hmmerOpts", nargs='+', help="hmmer options", action="store", type=str, default=['--notextw','--nonull2','--nobias','--dna','--tformat fasta'])
     parser.add_argument("-w", "--workDir", type=str, help="path to dir where intermediate files can be written", action="store", default=os.getcwd())
+    parser.add_argument("-t", "--hlatoolsPath", type=str, help="hlatools.dll filepath", action="store", default='hlatools.dll')
+    parser.add_argument("-n", "--nhmmerPath", type=str, help="nhmmer filepath", action="store", default='nhmmer')
     args = parser.parse_args()
 
     
@@ -110,19 +112,20 @@ def main():
         raise ValueError('No input reads were given to map! Please use (--fq1,fq2), --fq, or --bam')
     
     #map the reads onto the hmm from each gene of interest
-    hmmerGoiAlignments = nhmmer(readFiles, args.gois, args.workDir, hmmerOpts)
+    #hmmerGoiAlignments = nhmmer(readFiles, args.gois, args.workDir, hmmerOpts, args.nhmmerPath)
+    hmmerGoiAlignments = ['/media/kbeutner/data/tesla/roundX/unlock_data/P4HlaMapping/A_gen.txt','/media/kbeutner/data/tesla/roundX/unlock_data/P4HlaMapping/B_gen.txt','/media/kbeutner/data/tesla/roundX/unlock_data/P4HlaMapping/C_gen.txt'];
 
     #build a new, smaller, fa file with only the reads that mapped onto one or more goi
     goiFaFilepath = os.path.join(args.workDir, 'goi.fa.gz')
-    cmd = 'dotnet hlatools hmmerConvert -f fa -c on -o {0} -i {1}'.format(goiFaFilepath,' '.join(hmmerGoiAlignments))
+    cmd = 'dotnet {0} hmmerConvert -f fa -c on -o {1} -i {2}'.format(args.hlatoolsPath, goiFaFilepath,' '.join(hmmerGoiAlignments))
     print(cmd)
     subprocess.call(cmd, shell=True);
     
     #map the reads in goi.fa.gz onto the decoys
-    hmmerDecoyAlignments = nhmmer(goiFaFilepath, args.decoys, args.workDir, hmmerOpts)
+    hmmerDecoyAlignments = nhmmer(goiFaFilepath, args.decoys, args.workDir, hmmerOpts, args.nhmmerPath)
     
     #output the final bam file
-    cmd = 'dotnet hlatools hmmerConvert -f sam -c off -i {0} | samtools view -Sb - | samtools sort - {1}'.format(' '.join(hmmerGoiAlignments + hmmerDecoyAlignments),args.out)
+    cmd = 'dotnet hlatools hmmerConvert -f sam -c off -i {0} | samtools view -Sb - | samtools sort - -o {1}'.format(' '.join(hmmerGoiAlignments + hmmerDecoyAlignments),args.out)
     print(cmd)
     subprocess.call(cmd, shell=True);
         
