@@ -3,15 +3,13 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.28010.2046
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "hlatools", "hlatools\hlatools.csproj", "{4FAD06F1-956D-4938-A74D-73AA136DDB69}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "hlatools", "hlatools\hlatools.csproj", "{4FAD06F1-956D-4938-A74D-73AA136DDB69}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "hlatools.core", "hlatools.core\hlatools.core.csproj", "{4DBB8639-F1AF-4161-8260-796F243C8D1B}"
-EndProject
-Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "genotypeHla", "genotypeHla\genotypeHla.pyproj", "{E1CEAFE7-26E9-446E-B449-A0A8973B1B3C}"
-EndProject
-Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "updateHlaNomenclature", "updateHlaNomenclature\updateHlaNomenclature.pyproj", "{CF713DBB-3E85-48CC-A464-DF9C520EAF56}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "hlatools.core", "hlatools.core\hlatools.core.csproj", "{4DBB8639-F1AF-4161-8260-796F243C8D1B}"
 EndProject
 Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "hlaHmmer", "hlaHmmer\hlaHmmer.pyproj", "{B44537A1-1AEC-4055-B632-820A018A7AFC}"
+EndProject
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "hlaNomUpdate", "hlaNomUpdate\hlaNomUpdate.pyproj", "{EB3771E1-A56A-4AE3-BCA0-F8C899DF4CCC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -27,12 +25,10 @@ Global
 		{4DBB8639-F1AF-4161-8260-796F243C8D1B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4DBB8639-F1AF-4161-8260-796F243C8D1B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4DBB8639-F1AF-4161-8260-796F243C8D1B}.Release|Any CPU.Build.0 = Release|Any CPU
-		{E1CEAFE7-26E9-446E-B449-A0A8973B1B3C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{E1CEAFE7-26E9-446E-B449-A0A8973B1B3C}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{CF713DBB-3E85-48CC-A464-DF9C520EAF56}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{CF713DBB-3E85-48CC-A464-DF9C520EAF56}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B44537A1-1AEC-4055-B632-820A018A7AFC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{B44537A1-1AEC-4055-B632-820A018A7AFC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EB3771E1-A56A-4AE3-BCA0-F8C899DF4CCC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EB3771E1-A56A-4AE3-BCA0-F8C899DF4CCC}.Release|Any CPU.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
