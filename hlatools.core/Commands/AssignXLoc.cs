@@ -75,14 +75,14 @@ namespace hlatools.core
             //}
 
             //filter-out unpaired reads
-            allReads = allReads.GroupBy(r => r.Rname)
-                               .SelectMany(g => g.GroupBy(r => r.Qname.Split(new char[] { '/', '_' })[0])
-                                                 .Where(gw => gw.Count() > 1)
-                                                 .SelectMany(gsm => gsm))
-                                                 .ToList();
+            //allReads = allReads.GroupBy(r => r.Rname)
+            //                   .SelectMany(g => g.GroupBy(r => r.Qname.Split(new char[] { '/', '_' })[0])
+            //                                     .Where(gw => gw.Count() > 1)
+            //                                     .SelectMany(gsm => gsm))
+            //                                     .ToList();
 
             //assign reads to locus based on HN (normalized hmmer score)
-            allReads = allReads.Where(r => (r.Opts["HN"] as SamSeqFloatOpt).Value >= 0.80F).ToList();
+            //allReads = allReads.Where(r => (r.Opts["HN"] as SamSeqFloatOpt).Value >= 0.80F).ToList();
             allReads = allReads.GroupBy(r => r.Qname)
                                .Select(g => g.OrderBy(r => -(r.Opts["HN"] as SamSeqFloatOpt).Value).First())
                                .ToList();

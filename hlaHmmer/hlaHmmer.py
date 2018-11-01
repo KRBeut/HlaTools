@@ -18,6 +18,7 @@ def dir_path(string):
     else:
         raise ValueError(string)
 
+#tmp Karl's unix changes . . .
 #def cmd2Subproc(cmdStr,stdIn=None,stdOut=None,stdErr=None):
 #    toks = [x.strip() for x in cmdStr.split('|')]
 #    p = None
@@ -34,7 +35,9 @@ def filepath2Pipe(filepath):
     pipeline = []
     ext = os.path.splitext(filepath)[1]
     if ext == '.bam':
-        return 'samtools fasta -F 0x900 {0}'.format(filepath)
+        #return 'samtools fasta -F 0x900 {0}'.format(filepath)
+        cmd = 'samtools view {0} | '.format(filepath)+' gawk \'{split($1,a,"_|/");printf(">%s|%d\\n%s\\n",a[1],and($2,193),$10)\'}'
+        return cmd
     else:
         if ext == '.gz':
             faPipes = 'gzip -cdk {0}'.format(filepath)
@@ -42,31 +45,36 @@ def filepath2Pipe(filepath):
         else:
             faPipes = 'cat {0}'.format(filepath)        
         if ext == '.fq':
-            faPipes = faPipes+' | awk \'{if(NR%4==1) {split(substr($0,2),a," "); printf(">%s_2\\n",a[1]);} else if(NR%4==2) print;}\''        
+            faPipes = faPipes+' | awk \'{if(NR%4==1) {split(substr($0,2),a," "); printf(">%s\\n",a[1]);} else if(NR%4==2) print;}\''        
         return faPipes
 
-def nhmmer(readFiles,hmmFiles,workDir,hmmerOpts,nhmmerPath = 'nhmmer', hlatoolsPath='hlatools'):
+def nhmmer(readFiles,hmmFiles,workDir,hmmerOpts,nhmmerPath = 'nhmmer', hlatoolsPath='hlatools.dll'):
     if isinstance(readFiles,str):
         readFiles = [readFiles]
     
     k = 0
     faPipes = [filepath2Pipe(x) for x in set(readFiles)]
-    hmmerCmdTemplate = nhmmerPath+' {0} {1} -';
-    hlatoolsCmdTemplate = 'dotnet {0}'.format(hlatoolsPath) +' hmmerConvert -f sam -c off -i - | samtools sort -n -T sortTmp - | samtools fixmate -O bam -o {0} -'
-    #cmd = 'dotnet {0} hmmerConvert -f sam -c off -i {1} | samtools sort -n -O bam -o {2} -'.format(args.hlatoolsPath, ' '.join(hmmerGoiAlignments + hmmerDecoyAlignments),args.out)
+    hmmerCmdTemplate = nhmmerPath+' {0} -o {1} {2} -';
+    hlatoolsCmdTemplate = 'dotnet {0}'.format(hlatoolsPath) +' hmmerConvert -f sam -c off -i - | samtools sort -n -o {0} -'
 
     multiFaPipes = len(faPipes) > 1
-    hmmerGoiAlignments = []
+    alignments = []
     for fa in faPipes:
         k=k+1
         for hmmFilepath in hmmFiles:
-            outFilename = os.path.splitext(os.path.basename(hmmFilepath))[0]+'{0}.bam'.format('_{0}'.format(k) if multiFaPipes else '')
-            outFilepath = os.path.join(workDir,outFilename)
-            hmmerGoiAlignments.append(outFilepath)
-            cmd = '{0} | {1} | {2}'.format(fa,hmmerCmdTemplate.format(hmmerOpts,hmmFilepath),hlatoolsCmdTemplate.format(outFilepath))
+            outBamFilename = os.path.splitext(os.path.basename(hmmFilepath))[0]+'{0}.bam'.format('_{0}'.format(k) if multiFaPipes else '')
+            outTxtFilename = os.path.splitext(os.path.basename(hmmFilepath))[0]+'{0}.txt'.format('_{0}'.format(k) if multiFaPipes else '')
+            outBamFilepath = os.path.join(workDir,outBamFilename)
+            outTxtFilepath = os.path.join(workDir,outTxtFilename)
+            alignments.append(outBamFilepath)
+            cmd = '{0} | {1}'.format(fa,hmmerCmdTemplate.format(hmmerOpts,outTxtFilepath,hmmFilepath))
             print(cmd)
             subprocess.call(cmd, shell=True);
-    return hmmerGoiAlignments
+            cmd = 'cat {0} | {1}'.format(outTxtFilepath,hlatoolsCmdTemplate.format(outBamFilepath))
+            print(cmd)
+            subprocess.call(cmd, shell=True);
+            os.remove(outTxtFilepath)
+    return alignments
 
 def main():
     
@@ -119,25 +127,36 @@ def main():
     
     #build a new, smaller, fa file with only the reads that mapped onto one or more goi
     goiFaFilepath = os.path.join(args.workDir,'goi.fa.gz')
-    cmd = 'samtools merge - {0} | samtools sort -n -T tmpGoiSort - | samtools fasta -F 0x900 - | gzip > {1}'.format(' '.join(hmmerGoiAlignments),goiBamFilepath);
+    cmd = 'samtools cat {0} | samtools sort -n - | samtools fasta -F 0x900 - | gzip > {1}'.format(' '.join(hmmerGoiAlignments),goiFaFilepath);
     print(cmd)
     subprocess.call(cmd, shell=True);
     
     #map the reads in goi.fa.gz onto the decoys
-    hmmerDecoyAlignments = nhmmer(goiFaFilepath, args.decoys, args.workDir, hmmerOpts, args.nhmmerPath)
+    hmmerDecoyAlignments = nhmmer(goiFaFilepath, args.decoys, args.workDir, hmmerOpts, args.nhmmerPath, args.hlatoolsPath)
+    
+    #re-attach mate info from input file(s), and fix mates
+    mateAwk = 'gawk \'BEGIN{OFS="\\t"}{if(!($1 ~ /^@/)){split($1,a,"|");$1=a[1];$2=or(or($2,a[2]),2);print($0);} else print}\''
+    allBams = hmmerGoiAlignments + hmmerDecoyAlignments
+    mfBams = []
+    for bam in allBams:
+        mfFilepath = bam.replace('.bam', '_MatesFixed.bam')
+        mfBams.append(mfFilepath)
+        cmd = 'samtools view -h {0} | {1} | samtools view -bh | samtools sort -n - | samtools fixmate -m - {2}'.format(bam,mateAwk,mfFilepath)
+        print(cmd)
+        subprocess.call(cmd, shell=True);
     
     #output the final bam file (sorted by read name)
-    ##cmd = 'dotnet {0} hmmerConvert -f sam -c off -i {1} | samtools view -Sb - | samtools sort - -o {2}'.format(args.hlatoolsPath, ' '.join(hmmerGoiAlignments + hmmerDecoyAlignments),args.out)
-    #cmd = 'dotnet {0} hmmerConvert -f sam -c off -i {1} | samtools sort -n -O bam -o {2} -'.format(args.hlatoolsPath, ' '.join(hmmerGoiAlignments + hmmerDecoyAlignments),args.out)
-    cmd = 'samtools merge - {0} | samtools sort -O BAM -o {1} -'.format(' '.join(hmmerGoiAlignments + hmmerDecoyAlignments),args.out)
+    cmd = 'samtools cat {0} | samtools sort -n -o {1} -'.format(' '.join(mfBams),args.out)
     print(cmd)
     subprocess.call(cmd, shell=True);
-        
+    
     #clean-up intermediate files
     #os.remove(goiFaFilepath)
     #for f in hmmerGoiAlignments:
     #    os.remove(f)
     #for f in hmmerDecoyAlignments:
+    #    os.remove(f)
+    #for f in mfBams:
     #    os.remove(f)
 
 if __name__ == '__main__':
