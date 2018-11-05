@@ -74,27 +74,16 @@ namespace hlatools.core
             //    rd.Rname = rd.ReadGroup;
             //}
 
-            //filter-out unpaired reads
-            //allReads = allReads.GroupBy(r => r.Rname)
-            //                   .SelectMany(g => g.GroupBy(r => r.Qname.Split(new char[] { '/', '_' })[0])
-            //                                     .Where(gw => gw.Count() > 1)
-            //                                     .SelectMany(gsm => gsm))
-            //                                     .ToList();
-
             //assign reads to locus based on HN (normalized hmmer score)
             //allReads = allReads.Where(r => (r.Opts["HN"] as SamSeqFloatOpt).Value >= 0.80F).ToList();
             allReads = allReads.GroupBy(r => r.Qname)
-                               .Select(g => g.OrderBy(r => -(r.Opts["HN"] as SamSeqFloatOpt).Value).First())
+                               .SelectMany(g => 
+                               {
+                                   var M = g.Max(r => -(r.Opts["HN"] as SamSeqFloatOpt).Value);
+                                   return g.Where(r => -(r.Opts["HN"] as SamSeqFloatOpt).Value == M);
+                               })
                                .ToList();
-
-            //filter-out unpaired reads (again)
-            allReads = allReads.GroupBy(r => r.Rname)
-                               .SelectMany(g => g.GroupBy(r => r.Qname.Split(new char[] { '/', '_' })[0])
-                                                 .Where(gw => gw.Count() > 1)
-                                                 .SelectMany(gsm => gsm))
-                                                 .ToList();
-
-
+            
             //write the alignments to the sam file
             var xLocReadAssigner = new CrossLocusReadAssigner();
             var xLocReadInfo = xLocReadAssigner.GatherCrossLocusReads(allReads);

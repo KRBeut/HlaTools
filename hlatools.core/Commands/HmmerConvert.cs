@@ -90,7 +90,7 @@ namespace hlatools.core
             var reads = GetReads(inputFilePaths);
             using (var outputStrm = GetOutputStream(outputPath, format, compression))
             {
-                convertHmmer(format, reads, outputStrm);
+                ConvertHmmer(format, reads, outputStrm);
             }
             return string.Empty;
         }
@@ -108,19 +108,24 @@ namespace hlatools.core
                 using (var strmRdr = new StreamReader(inputStrm))
                 {
                     HmmerOuputParser h = new HmmerOuputParser();
-                    reads = h.Parse(strmRdr, out rName, out rLen).Values.ToList();
+                    reads = h.Parse(strmRdr, out rName, out rLen).Values;
+                    foreach (var r in reads)
+                    {
+                        yield return r;
+                    }
                 }
             }
             else
             {
                 //get the reads from specified file(s)
-                reads = inputFilePaths.SelectMany(f => HmmerOuputParser.Parse(f, out rName, out rLen).Values)
-                                      //.GroupBy(g => g.Qname)
-                                      //.Select(g => g.First())
-                                      //.OrderBy(r => r.Qname)
-                                      .ToList();
+                reads = inputFilePaths.SelectMany(f => HmmerOuputParser.Parse(f, out rName, out rLen).Values);
+                foreach (var r in reads)
+                {
+                    yield return r;
+                }
             }
-            return reads;
+
+            
         }
 
         static StreamWriter GetOutputStream(string output, string format, string compression)
@@ -147,7 +152,7 @@ namespace hlatools.core
             return strmWrtr;
         }
         
-        static string convertHmmer(string format, IEnumerable<SamSeq> reads, StreamWriter strmWrtr)
+        static string ConvertHmmer(string format, IEnumerable<SamSeq> reads, StreamWriter strmWrtr)
         {
             if (format == "sam")
             {

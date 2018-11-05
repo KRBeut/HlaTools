@@ -175,12 +175,11 @@ namespace hlatools.core.IO
 
         public void ParseAlignments(TextReader txtRdr, Dictionary<string, SamSeq> reads)
         {
-            SamSeq read;
             string fileLine;
             while ((fileLine = txtRdr.ReadLine()) != null)
             {
                 var readName = fileLine.Substring(3).Split()[0].Trim();
-                if (reads.TryGetValue(readName, out read))
+                if (reads.TryGetValue(readName, out SamSeq read))
                 {
                     ParseAlignment(txtRdr, read);
                 }
@@ -202,17 +201,66 @@ namespace hlatools.core.IO
             txtRdr.ReadLine();//score: <double> bits
             var alignedRefSeq = ParseAlignmentReferenceLine(txtRdr, read);//*gene name + alignmentStartPos + consensus sequence of hmm (Dots (.) in this line indicate insertions in the target sequence with respect to the model.)
             var seqMtch = ParseSequenceMatchLine(txtRdr.ReadLine());//matches between the query model and target sequence. A + indicates positive score, which can be interpreted as “conservative substitution”, with respect to what the model expects at that position.
-            var alignedTargetSeq = ParseAlignmentTargetLine(txtRdr.ReadLine(), read);//*read name + read start pos + read sequence ( Dashes (-) in this line indicate deletions in the target sequence with respect to the model.) + read end pos
+            var alignedTargetSeq = ParseAlignmentTargetLine(txtRdr.ReadLine(), alignedRefSeq, read);//*read name + read start pos + read sequence ( Dashes (-) in this line indicate deletions in the target sequence with respect to the model.) + read end pos
             var pp = ParseBackwardsLine(txtRdr.ReadLine(), read);//*results from the backwards algorithm applied to the traceback matrix (The bottom line represents the posterior probability (essentially the expected accuracy) of each aligned residue.A 0 means 0 - 5 %, 1 means 5 - 15 %, and so on; 9 means 85 - 95 %, and a *means 95 - 100 % posterior probability.You can use these posterior probabilities to decide which parts of the alignment are welldetermined or not.You’ll often observe, for example, that expected alignment accuracy degrades around locations of insertion and deletion, which you’d intuitively expect. You’ll also see expected alignment accuracy degrade at the ends of an alignment – this is because “alignment accuracy” posterior probabilities currently not only includes whether the residue is aligned to one model position versus others, but also confounded with whether a residue should be considered to be homologous(aligned to the model somewhere) versus not homologous at all.)
             txtRdr.ReadLine();//blank line
-            read.Cigar = Cigar.FromAlignedSeqs(alignedRefSeq, alignedTargetSeq);
             read.QualId = read.Rname;
             read.Qual = "*";//pp.Replace(".", "");
-            read.Seq = new String(alignedTargetSeq.Where(c => "atgcATGC".Contains(c)).ToArray());
+            
+            //if the qname has been packed with additional read data, then parse it out and assign it appropriately
+            //the format for this additional data is Qname|SamFlags|FullReadSeq|FullReadQvals
+            //if any on field is missing (except Qname, of course) it should be set to '*'
+            var qNameToks = read.Qname.Split('|');
+            read.Qname = qNameToks[0];
+            if (qNameToks.Length > 1 && int.TryParse(qNameToks[1], out int flags))
+            {
+                read.Flag = read.Flag | (SamFlag)flags;
+            }                
+            if (qNameToks.Length > 2 && qNameToks[2] != "*")
+            {
+                read.Seq = qNameToks[2];
+            }
+            if (qNameToks.Length > 3 && qNameToks[3] != "*")
+            {
+                read.Qual = qNameToks[3];
+            }
 
-            var mtchOpt = new SamSeqStringOpt("MT");
-            mtchOpt.Value = seqMtch.Replace(" ","-");
-            //Dict.Upsert(read.Opts, "MT", mtchOpt);
+            //add soft-clipping to the end of the read as needed
+            var cigLen = read.Cigar.ComputeQLen();
+            var lenDif = read.Seq.Length - cigLen;
+            if (lenDif > 0)
+            {
+                read.Cigar.Add(new CigTok("S", lenDif));
+            }
+        }
+
+        public string ParseAlignmentTargetLine(string targetLineStr, string alignedRefSeq, SamSeq read)
+        {
+            var toks = targetLineStr.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            var targetStartPos = int.Parse(toks[1]);
+            var alignedReadSeq = toks[2];
+            var targetEndPos = int.Parse(toks[3]);
+
+            read.Cigar = Cigar.FromAlignedSeqs(alignedRefSeq, alignedReadSeq);
+            var startSoftClip = targetStartPos - 1;
+            if (startSoftClip > 0)
+            {
+                var cigToks = new List<CigTok>() { new CigTok("S", startSoftClip) };
+                cigToks.AddRange(read.Cigar);
+                read.Cigar = new Cigar(cigToks);
+            }
+
+            if (targetStartPos > targetEndPos)
+            {
+                read.Flag = read.Flag | SamFlag.REVERSESEQ;
+            }
+            else
+            {
+
+            }
+
+            read.Seq = new String(alignedReadSeq.Where(c => "atgcATGC".Contains(c)).ToArray());
+            return alignedReadSeq;
         }
 
         public string ParseSequenceMatchLine(string mtchLine)
@@ -227,21 +275,7 @@ namespace hlatools.core.IO
             //read.Opts.Add("PP", new SamSeqStringOpt("PP") { Value = toks[0] });
             return toks[0];
         }
-
-        public string ParseAlignmentTargetLine(string targetLineStr, SamSeq read)
-        {
-            var toks = targetLineStr.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            var targetStartPos = int.Parse(toks[1]);
-            var alignedReadSeq = toks[2];
-            var targetEndPos = int.Parse(toks[3]);
-
-            if (targetStartPos > targetEndPos)
-            {
-                read.Flag = read.Flag | SamFlag.REVERSESEQ;
-            }
-            return alignedReadSeq;
-        }
-
+                
         public string ParseAlignmentReferenceLine(TextReader txtRdr, SamSeq read)
         {
             int pos;

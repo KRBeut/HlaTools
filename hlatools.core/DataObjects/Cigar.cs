@@ -103,6 +103,12 @@ namespace hlatools.core.DataObjects
             return op == Skipped;
         }
 
+        public static int ComputeQuqeryLen(IEnumerable<CigTok> cig)
+        {
+            int qLen = cig.Where(c => Cigar.IsInQseq(c.Op)).Sum(c => c.Length);
+            return qLen;
+        }
+
         public static int ComputeTLen(string cigStr)
         {
             var tLen = ComputeTLen(TokenizeCigar(cigStr));
@@ -321,7 +327,12 @@ namespace hlatools.core.DataObjects
         {
             return ComputeTLen(this);
         }
-        
+
+        public int ComputeQLen()
+        {
+            return ComputeQuqeryLen(this);
+        }
+
         public override string ToString()
         {
             return CigToksToString(this);
