@@ -124,7 +124,7 @@ namespace hlatools.core
                         h.ParseHeader(strmRdr, out string rName, out int rLen);
                         var reads = h.ParseAlignments(strmRdr);
                         
-                        var wlkr = new ReadNameWalker(reads.Where(r => r.Mapq > 89).OrderBy(r=>r.Qname));
+                        var wlkr = new ReadNameWalker(reads.Where(r => r.Mapq > 79).OrderBy(r=>r.Qname));
                         var readPairs = new List<List<SamSeq>>();
                         foreach (var readList in wlkr.ReadSets())
                         {
