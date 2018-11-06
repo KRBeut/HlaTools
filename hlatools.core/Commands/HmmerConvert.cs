@@ -97,9 +97,7 @@ namespace hlatools.core
 
         static IEnumerable<SamSeq> GetReads(IList<string> inputFilePaths)
         {
-            int rLen;
-            string rName;
-            IEnumerable<SamSeq> reads;
+            HmmerOuputParser h = new HmmerOuputParser();
             if (inputFilePaths == null || (inputFilePaths.Count() == 1 && inputFilePaths.First() == "-"))
             {
                 //get the reads from standard in
@@ -107,8 +105,8 @@ namespace hlatools.core
                 using (var inputStrm = Console.OpenStandardInput())
                 using (var strmRdr = new StreamReader(inputStrm))
                 {
-                    HmmerOuputParser h = new HmmerOuputParser();
-                    reads = h.Parse(strmRdr, out rName, out rLen).Values;
+                    h.ParseHeader(strmRdr, out string rName, out int rLen);
+                    var reads = h.ParseAlignments(strmRdr);
                     foreach (var r in reads)
                     {
                         yield return r;
@@ -118,10 +116,79 @@ namespace hlatools.core
             else
             {
                 //get the reads from specified file(s)
-                reads = inputFilePaths.SelectMany(f => HmmerOuputParser.Parse(f, out rName, out rLen).Values);
-                foreach (var r in reads)
+                foreach (var f in inputFilePaths)
                 {
-                    yield return r;
+                    using (var strm = File.Open(f, FileMode.Open, FileAccess.Read, FileShare.Read))
+                    using (var strmRdr = f.EndsWith(".gz") ? new StreamReader(new GZipStream(strm, CompressionMode.Decompress)) : new StreamReader(strm))
+                    {
+                        h.ParseHeader(strmRdr, out string rName, out int rLen);
+                        var reads = h.ParseAlignments(strmRdr);
+                        
+                        var wlkr = new ReadNameWalker(reads.Where(r => r.Mapq > 89).OrderBy(r=>r.Qname));
+                        var readPairs = new List<List<SamSeq>>();
+                        foreach (var readList in wlkr.ReadSets())
+                        {
+                            var bestRead1 = readList.Where(r => r.Flag.HasFlag(SamFlag.READ1)).OrderBy(r => -r.Mapq).FirstOrDefault();
+                            var bestRead2 = readList.Where(r => r.Flag.HasFlag(SamFlag.READ2)).OrderBy(r => -r.Mapq).FirstOrDefault();
+                            if (bestRead1 != null && bestRead2 != null)
+                            {
+                                //set the read paired flags for each read
+                                bestRead1.Flag |= SamFlag.PAIRED;
+                                bestRead2.Flag |= SamFlag.PAIRED;
+
+                                //set the read properly paired flag, not neccessarily because
+                                //the read is properly paired, but just so that samtools fixmate
+                                //can unset the flag if it is not properly paired
+                                bestRead1.Flag |= SamFlag.PROPER_PAIR;
+                                bestRead2.Flag |= SamFlag.PROPER_PAIR;
+
+                                //set the appropriate mate reverse strand flag
+                                if (bestRead1.Flag.HasFlag(SamFlag.REVERSESEQ))
+                                {
+                                    bestRead2.Flag |= SamFlag.MREVERSESEQ;
+                                }
+                                if (bestRead2.Flag.HasFlag(SamFlag.REVERSESEQ))
+                                {
+                                    bestRead1.Flag |= SamFlag.MREVERSESEQ;
+                                }
+
+                                //set the Pnext for each read
+                                bestRead1.Pnext = bestRead2.Pos;
+                                bestRead2.Pnext = bestRead1.Pos;
+
+                                //set Rnext for each read
+                                if (bestRead1.Rname == bestRead2.Rname)
+                                {
+                                    bestRead1.Rnext = "=";
+                                    bestRead2.Rnext = "=";
+                                }
+                                else
+                                {
+                                    bestRead1.Rnext = bestRead2.Rname;
+                                    bestRead2.Rnext = bestRead1.Rname;
+                                }
+
+                                //compute and set the tempalte length (TLEN)
+                                var maxCoord = Math.Max(bestRead1.Pos + bestRead1.Cigar.ComputeTLen(), bestRead2.Pos + bestRead2.Cigar.ComputeTLen());
+                                var minCoord = Math.Min(bestRead1.Pos, bestRead2.Pos);
+                                var tLen = maxCoord - minCoord;
+                                bestRead1.Length = tLen;
+                                bestRead2.Length = tLen;
+
+                                yield return bestRead1;
+                                yield return bestRead2;
+                            }
+
+                            //if (bestRead1 != null)
+                            //{
+                            //    yield return bestRead1;
+                            //}
+                            //if (bestRead2 != null)
+                            //{
+                            //    yield return bestRead2;
+                            //}
+                        }
+                    }
                 }
             }
 
@@ -161,6 +228,7 @@ namespace hlatools.core
             else
             {
                 //don't output duplicate reads in the fa or fq file format
+                //TODO: include flag info so that read pairs are both output
                 reads = reads.GroupBy(g => g.Qname).Select(g => g.First()).OrderBy(r => r.Qname);
                 if (format.ToLower() == "fa")
                 {

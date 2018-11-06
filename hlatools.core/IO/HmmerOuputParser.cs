@@ -14,34 +14,12 @@ namespace hlatools.core.IO
     public class HmmerOuputParser
     {
         
-        public static Dictionary<string, SamSeq> Parse(string hmmerOutputFilepath, out string rName, out int rLen, double minScore = double.MinValue)
-        {
-            var prsr = new HmmerOuputParser();
-            Dictionary<string, SamSeq> dict;
-            using (var strm = File.Open(hmmerOutputFilepath, FileMode.Open, FileAccess.Read, FileShare.Read))
-            using (var strmRdr = hmmerOutputFilepath.EndsWith(".gz") ? new StreamReader(new GZipStream(strm, CompressionMode.Decompress)) : new StreamReader(strm))
-            {
-                dict = prsr.Parse(strmRdr, out rName, out rLen, minScore);
-            }
-            return dict;
-        }
-
-        public static void ParseQueryLine(string hmmerOutputFilepath, out string rName, out int rLen)
-        {
-            var prsr = new HmmerOuputParser();
-            using (var strm = File.Open(hmmerOutputFilepath, FileMode.Open, FileAccess.Read, FileShare.Read))
-            using (var strmRdr = new StreamReader(strm))
-            {
-                prsr.ParseQueryLine(strmRdr, out rName, out rLen);
-            }
-        }
-
         public HmmerOuputParser()
         {
 
         }
 
-        protected void ParseHeader(TextReader txtRdr)
+        public void ParseHeader(TextReader txtRdr, out string rName, out int rLen)
         {
             string fileLine;
             while (txtRdr.Peek() == '#' && (fileLine = txtRdr.ReadLine()) != null)
@@ -49,24 +27,22 @@ namespace hlatools.core.IO
                 //fast-forward over the header lines
             }
             txtRdr.ReadLine();//read the blank line after the header
+            ParseMatchTable(txtRdr, out rName, out rLen);
         }
 
         protected static readonly char[] hitTableSplitChars = new char[] { ' ' };
 
-        public Dictionary<string, SamSeq> Parse(TextReader txtRdr, out string rName, out int rLen, double minScore = double.MinValue)
+        public IEnumerable<SamSeq> ParseAlignments(TextReader txtRdr, double minScore = double.MinValue)
         {
-            ParseHeader(txtRdr);
-            var dict = ParseMatchTable(txtRdr, out rName, out rLen, minScore);
-            if (dict != null && dict.Count > 0)
+            foreach (var read in ParseAlignments(txtRdr))
             {
-                ParseAlignments(txtRdr, dict);
+                yield return read;
             }
-            return dict;
         }
 
         protected void ParseQueryLine(TextReader txtRdr, out string rName, out int rLen)
         {
-            ParseHeader(txtRdr);
+            ParseHeader(txtRdr, out rName, out rLen);
             ParseQueryString(txtRdr.ReadLine(), out rName, out rLen);
         }
 
@@ -77,13 +53,11 @@ namespace hlatools.core.IO
             rLen = int.Parse(toks[3]);
         }
 
-        protected Dictionary<string,SamSeq> ParseMatchTable(TextReader txtRdr, out string rName, out int rLen, double minScore = double.MinValue)
+        protected void ParseMatchTable(TextReader txtRdr, out string rName, out int rLen, double minScore = double.MinValue)
         {
             string fileLine;
             rLen = 0;
             rName = string.Empty;
-            var dict = new Dictionary<string, SamSeq>();
-            float maxScore = float.NaN;
             while ((fileLine = txtRdr.ReadLine()) != null)
             {
                 if (fileLine.StartsWith("Query", StringComparison.CurrentCultureIgnoreCase))
@@ -95,111 +69,133 @@ namespace hlatools.core.IO
                 }
                 else
                 {
-                    var lineToks = fileLine.Split(hitTableSplitChars, StringSplitOptions.RemoveEmptyEntries);
-                    if (lineToks.Length < 6)
+                    while ((fileLine = txtRdr.ReadLine()) != null 
+                        && !fileLine.Trim().StartsWith("Annotation")
+                        && !fileLine.Trim().StartsWith("Domain"))
                     {
-                        if (string.IsNullOrWhiteSpace(fileLine) || fileLine.Trim().StartsWith("---"))
-                        {
-                            while ((fileLine = txtRdr.ReadLine()) != null 
-                                && !fileLine.Trim().StartsWith("Annotation")
-                                && !fileLine.Trim().StartsWith("Domain"))
-                            {
-                                //read to the start of the alignment section
-                            }
-                            break;
-                        }
+                        //read to the start of the alignment section
                     }
+                    break;
+                    //var lineToks = fileLine.Split(hitTableSplitChars, StringSplitOptions.RemoveEmptyEntries);
+                    //if (lineToks.Length < 6)
+                    //{
+                    //    if (string.IsNullOrWhiteSpace(fileLine) || fileLine.Trim().StartsWith("---"))
+                    //    {
+                    //        while ((fileLine = txtRdr.ReadLine()) != null 
+                    //            && !fileLine.Trim().StartsWith("Annotation")
+                    //            && !fileLine.Trim().StartsWith("Domain"))
+                    //        {
+                    //            //read to the start of the alignment section
+                    //        }
+                    //        break;
+                    //    }
+                    //}
+                    //if (fileLine.Trim().StartsWith("---") || lineToks.Length < 5)
+                    //{
+                    //    continue;
+                    //}
 
-                    if (fileLine.Trim().StartsWith("---") || lineToks.Length < 5)
-                    {
-                        continue;
-                    }
+                    //float evalue;
+                    //if (!float.TryParse(lineToks[0],out evalue))
+                    //{
+                    //    continue;
+                    //}
 
-                    float evalue;
-                    if (!float.TryParse(lineToks[0],out evalue))
-                    {
-                        continue;
-                    }
-                                        
-                    float score;
-                    if (!float.TryParse(lineToks[1], out score))
-                    {
-                        continue;
-                    }
-                    if (score < minScore)
-                    {
-                        continue;
-                    }
-                    if (float.IsNaN(maxScore))
-                    {
-                        maxScore = score;
-                    }
+                    //float score;
+                    //if (!float.TryParse(lineToks[1], out score))
+                    //{
+                    //    continue;
+                    //}
+                    //if (score < minScore)
+                    //{
+                    //    continue;
+                    //}
+                    //if (float.IsNaN(maxScore))
+                    //{
+                    //    maxScore = score;
+                    //}
 
-                    float bias;
-                    if (!float.TryParse(lineToks[2],out bias))
-                    {
-                        continue;
-                    }
+                    //float bias;
+                    //if (!float.TryParse(lineToks[2],out bias))
+                    //{
+                    //    continue;
+                    //}
 
-                    var qName = lineToks[3];
+                    //var qName = lineToks[3];
 
-                    double start;
-                    if (!double.TryParse(lineToks[4],out start))
-                    {
-                        continue;
-                    }
+                    //double start;
+                    //if (!double.TryParse(lineToks[4],out start))
+                    //{
+                    //    continue;
+                    //}
 
-                    double end;
-                    if (!double.TryParse(lineToks[5], out end))
-                    {
-                        continue;
-                    }
-                    var description = lineToks.Length > 6 ? lineToks[6] : string.Empty;
+                    //double end;
+                    //if (!double.TryParse(lineToks[5], out end))
+                    //{
+                    //    continue;
+                    //}
+                    //var description = lineToks.Length > 6 ? lineToks[6] : string.Empty;
 
-                    var read = new SamSeq()
-                    {
-                        Mapq = (int)Math.Round(score),
-                        Qname = qName,
-                        Pos = (int)start-1
-                    };
-                    read.Opts.Add("HE", new SamSeqFloatOpt("HE") { Value = evalue });
-                    read.Opts.Add("HS", new SamSeqFloatOpt("HS") { Value = score });
-                    read.Opts.Add("HN", new SamSeqFloatOpt("HN") { Value = score/maxScore });
-                    read.Opts.Add("HB", new SamSeqFloatOpt("HB") { Value = bias });
+                    //var read = new SamSeq()
+                    //{
+                    //    Mapq = (int)Math.Round(score),
+                    //    Qname = qName,
+                    //    Pos = (int)start-1
+                    //};
+                    //read.Opts.Add("HE", new SamSeqFloatOpt("HE") { Value = evalue });
+                    //read.Opts.Add("HS", new SamSeqFloatOpt("HS") { Value = score });
+                    //read.Opts.Add("HN", new SamSeqFloatOpt("HN") { Value = score/maxScore });
+                    //read.Opts.Add("HB", new SamSeqFloatOpt("HB") { Value = bias });
 
-                    Dict.Upsert(dict, qName, read);
+                    //Dict.Upsert(dict, qName, read);
                     //dict.Add(qName, read);                    
                 }
             }
-            return dict;
         }
 
-        public void ParseAlignments(TextReader txtRdr, Dictionary<string, SamSeq> reads)
+        public IEnumerable<SamSeq> ParseAlignments(TextReader txtRdr)
         {
-            string fileLine;
-            while ((fileLine = txtRdr.ReadLine()) != null)
+            int n = 0;
+            while (txtRdr.Peek() != -1)
             {
-                var readName = fileLine.Substring(3).Split()[0].Trim();
-                if (reads.TryGetValue(readName, out SamSeq read))
+                var read = ParseAlignment(txtRdr);
+                if (read == null)
                 {
-                    ParseAlignment(txtRdr, read);
+                    yield break;
                 }
-                else
-                {
-                    break;//we have reached the alignments that are below the cutoff
-                }
-            }
+                n++;
+                yield return read;
+            }            
         }
 
-        public void ParseAlignment(TextReader txtRdr, SamSeq read)
+        public SamSeq ParseAlignment(TextReader txtRdr)
         {
-            //var fileLine = txtRdr.ReadLine();//>> <read name>
-            var fileLine = txtRdr.ReadLine();//column headers
+
+            var fileLine = txtRdr.ReadLine();//>> <read name>
+            if (string.IsNullOrWhiteSpace(fileLine))
+            {
+                return null;//end of alignments
+            }
+            var readName = fileLine.Substring(3).Split()[0].Trim();
+            var read = new SamSeq() { Qname = readName };
+
+            fileLine = txtRdr.ReadLine();//column headers
             txtRdr.ReadLine();//dashes under the column headers
-            txtRdr.ReadLine();//match information
+            fileLine = txtRdr.ReadLine();//match information
+
+            var toks = fileLine.Split(" ", StringSplitOptions.RemoveEmptyEntries);
+            var score = (float)double.Parse(toks[1]);
+            var bias = (float)double.Parse(toks[2]);
+            var evalue = (float)double.Parse(toks[3]);
+
+            read.Opts.Add("HE", new SamSeqFloatOpt("HE") { Value = evalue });
+            //read.Opts.Add("HS", new SamSeqFloatOpt("HS") { Value = score });
+            read.Opts.Add("HB", new SamSeqFloatOpt("HB") { Value = bias });
+            read.Mapq = (int)score;
+
             txtRdr.ReadLine();//blank line
             txtRdr.ReadLine();//Alignment:
-            txtRdr.ReadLine();//score: <double> bits
+            txtRdr.ReadLine();//score: <float> bits
             var alignedRefSeq = ParseAlignmentReferenceLine(txtRdr, read);//*gene name + alignmentStartPos + consensus sequence of hmm (Dots (.) in this line indicate insertions in the target sequence with respect to the model.)
             var seqMtch = ParseSequenceMatchLine(txtRdr.ReadLine());//matches between the query model and target sequence. A + indicates positive score, which can be interpreted as “conservative substitution”, with respect to what the model expects at that position.
             var alignedTargetSeq = ParseAlignmentTargetLine(txtRdr.ReadLine(), alignedRefSeq, read);//*read name + read start pos + read sequence ( Dashes (-) in this line indicate deletions in the target sequence with respect to the model.) + read end pos
@@ -216,23 +212,55 @@ namespace hlatools.core.IO
             if (qNameToks.Length > 1 && int.TryParse(qNameToks[1], out int flags))
             {
                 read.Flag = read.Flag | (SamFlag)flags;
-            }                
+            }
             if (qNameToks.Length > 2 && qNameToks[2] != "*")
             {
                 read.Seq = qNameToks[2];
+
+                //add soft-clipping to the end of the read as needed
+                var cigLen = read.Cigar.ComputeQLen();
+                var lenDif = read.Seq.Length - cigLen;
+                if (lenDif > 0)
+                {
+                    read.Cigar.Add(new CigTok("S", lenDif));
+                }
+
+                if (read.Flag.HasFlag(SamFlag.REVERSESEQ))
+                {
+                    read.Seq = new String(SeqUtils.RevComp(read.Seq).ToArray());
+                                        
+                    //flip the soft clipping in the cigar
+                    var first = read.Cigar.First();
+                    var last = read.Cigar.Last();
+                    if (first != last)
+                    {
+                        if (last.Op == "S")
+                        {
+                            read.Cigar[0] = last;
+                        }
+                        if (first.Op == "S")
+                        {
+                            read.Cigar[read.Cigar.Count - 1] = first;
+                        }
+
+                    }
+                }
             }
             if (qNameToks.Length > 3 && qNameToks[3] != "*")
             {
                 read.Qual = qNameToks[3];
+                if (read.Flag.HasFlag(SamFlag.REVERSESEQ))
+                {
+                    read.Qual = new String(read.Qual.Reverse().ToArray());
+                }
             }
 
-            //add soft-clipping to the end of the read as needed
-            var cigLen = read.Cigar.ComputeQLen();
-            var lenDif = read.Seq.Length - cigLen;
-            if (lenDif > 0)
-            {
-                read.Cigar.Add(new CigTok("S", lenDif));
-            }
+            
+
+            
+
+            
+            return read;
         }
 
         public string ParseAlignmentTargetLine(string targetLineStr, string alignedRefSeq, SamSeq read)
@@ -243,7 +271,7 @@ namespace hlatools.core.IO
             var targetEndPos = int.Parse(toks[3]);
 
             read.Cigar = Cigar.FromAlignedSeqs(alignedRefSeq, alignedReadSeq);
-            var startSoftClip = targetStartPos - 1;
+            var startSoftClip = Math.Min(targetStartPos,targetEndPos) - 1;
             if (startSoftClip > 0)
             {
                 var cigToks = new List<CigTok>() { new CigTok("S", startSoftClip) };
