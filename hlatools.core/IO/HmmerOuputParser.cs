@@ -3,6 +3,7 @@ using hlatools.core.Utils;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -18,7 +19,7 @@ namespace hlatools.core.IO
             var prsr = new HmmerOuputParser();
             Dictionary<string, SamSeq> dict;
             using (var strm = File.Open(hmmerOutputFilepath, FileMode.Open, FileAccess.Read, FileShare.Read))
-            using (var strmRdr = new StreamReader(strm))
+            using (var strmRdr = hmmerOutputFilepath.EndsWith(".gz") ? new StreamReader(new GZipStream(strm, CompressionMode.Decompress)) : new StreamReader(strm))
             {
                 dict = prsr.Parse(strmRdr, out rName, out rLen, minScore);
             }
