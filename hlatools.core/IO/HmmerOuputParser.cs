@@ -266,9 +266,9 @@ namespace hlatools.core.IO
                 }
             }
 
-            if (read.Flag.HasFlag(SamFlag.PAIRED) && string.IsNullOrWhiteSpace(read.Rnext))
+            if (read.Flag.HasFlag(SamFlag.PAIRED) && (read.Rnext == "*" || string.IsNullOrWhiteSpace(read.Rnext)))
             {
-                read.Rnext = "=";
+                read.Rnext = read.Rname;
             }
 
             return read;
