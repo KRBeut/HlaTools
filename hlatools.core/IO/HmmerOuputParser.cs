@@ -264,7 +264,13 @@ namespace hlatools.core.IO
                 {
                     read.Qual = new String(read.Qual.Reverse().ToArray());
                 }
-            }            
+            }
+
+            if (read.Flag.HasFlag(SamFlag.PAIRED) && string.IsNullOrWhiteSpace(read.Rnext))
+            {
+                read.Rnext = "=";
+            }
+
             return read;
         }
 
