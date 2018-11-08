@@ -209,10 +209,7 @@ namespace hlatools.core.IO
             //if any on field is missing (except Qname, of course) it should be set to '*'
             var qNameToks = read.Qname.Split('|');
             read.Qname = qNameToks[0];
-            if (read.Qname == "K00193:174:HJNTHBBXX:7:2203:11921:35022")
-            {
-
-            }
+            
             if (qNameToks.Length > 1 && int.TryParse(qNameToks[1], out int flags))
             {
                 read.Flag = read.Flag | (SamFlag)flags;
@@ -266,11 +263,7 @@ namespace hlatools.core.IO
                 }
             }
 
-            if (read.Flag.HasFlag(SamFlag.PAIRED) && (read.Rnext == "*" || string.IsNullOrWhiteSpace(read.Rnext)))
-            {
-                read.Rnext = "*";
-            }
-
+            read.Rnext = "*";
             return read;
         }
 

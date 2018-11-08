@@ -69,15 +69,8 @@ namespace hlatools.core.Utils
                 switch (n)
                 {
                     case 'A':
-                        if (isRna)
-                        {
-                            yield return 'U';
-                        }
-                        else
-                        {
-                            yield return 'T';
-                        }
-                        break;
+                        yield return isRna ? 'U' : 'T';
+                        break;                    
                     case 'T':
                         yield return 'A';
                         break;
@@ -90,8 +83,23 @@ namespace hlatools.core.Utils
                     case 'U':
                         yield return 'A';
                         break;
+                    case 'a':
+                        yield return isRna ? 'u' : 't';
+                        break;
+                    case 't':
+                        yield return 'a';
+                        break;
+                    case 'g':
+                        yield return 'c';
+                        break;
+                    case 'c':
+                        yield return 'g';
+                        break;
+                    case 'u':
+                        yield return 'a';
+                        break;
                     default:
-                        yield return '?';
+                        yield return n;
                         break;
                 }
             }
