@@ -209,6 +209,10 @@ namespace hlatools.core.IO
             //if any on field is missing (except Qname, of course) it should be set to '*'
             var qNameToks = read.Qname.Split('|');
             read.Qname = qNameToks[0];
+            if (read.Qname == "K00193:174:HJNTHBBXX:7:2203:11921:35022")
+            {
+
+            }
             if (qNameToks.Length > 1 && int.TryParse(qNameToks[1], out int flags))
             {
                 read.Flag = read.Flag | (SamFlag)flags;
@@ -234,13 +238,20 @@ namespace hlatools.core.IO
                     var last = read.Cigar.Last();
                     if (first != last)
                     {
-                        if (last.Op == "S")
+                        if (first.Op == "S" && last.Op == "S")
                         {
                             read.Cigar[0] = last;
-                        }
-                        if (first.Op == "S")
-                        {
                             read.Cigar[read.Cigar.Count - 1] = first;
+                        }
+                        else if (last.Op == "S")
+                        {
+                            read.Cigar.RemoveAt(read.Cigar.Count - 1);
+                            read.Cigar.Insert(0, last);
+                        }
+                        else if (first.Op == "S")
+                        {
+                            read.Cigar.RemoveAt(0);
+                            read.Cigar.Add(first);
                         }
 
                     }
@@ -253,13 +264,7 @@ namespace hlatools.core.IO
                 {
                     read.Qual = new String(read.Qual.Reverse().ToArray());
                 }
-            }
-
-            
-
-            
-
-            
+            }            
             return read;
         }
 
