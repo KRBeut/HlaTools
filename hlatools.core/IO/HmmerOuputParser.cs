@@ -268,7 +268,7 @@ namespace hlatools.core.IO
 
             if (read.Flag.HasFlag(SamFlag.PAIRED) && (read.Rnext == "*" || string.IsNullOrWhiteSpace(read.Rnext)))
             {
-                read.Rnext = read.Rname;
+                read.Rnext = "*";
             }
 
             return read;
