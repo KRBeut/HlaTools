@@ -18,62 +18,37 @@ def dir_path(string):
     else:
         raise ValueError(string)
 
-#tmp Karl's unix changes . . .
-#def cmd2Subproc(cmdStr,stdIn=None,stdOut=None,stdErr=None):
-#    toks = [x.strip() for x in cmdStr.split('|')]
-#    p = None
-#    for cmd in toks:
-#        cmdToks = cmd.split()
-#        if not p:
-#            p = subprocess.Popen(cmdToks,stdin=stdIn,stdout=subprocess.PIPE)                
-#        else:
-#            p = subprocess.Popen(cmdToks,stdin=p.stdout, stdout=subprocess.PIPE)
-#    p.stdout = stdOut
-#    return p
-
-def filepath2Pipe(filepath):
-    pipeline = []
+def filepath2Pipe(filepath,flag):
     ext = os.path.splitext(filepath)[1]
-    if ext == '.bam':
-        #return 'samtools fasta -F 0x900 {0}'.format(filepath)
-        cmd = 'samtools view {0} | '.format(filepath)+' gawk \'{split($1,a,"_|/");printf(">%s|%d\\n%s\\n",a[1],and($2,193),$10)\'}'
-        return cmd
+    if ext == '.gz':
+        faPipe = 'gzip -cdk {0}'.format(filepath)
     else:
-        if ext == '.gz':
-            faPipes = 'gzip -cdk {0}'.format(filepath)
-            ext = os.path.splitext(os.path.splitext(filepath)[0])[1]
-        else:
-            faPipes = 'cat {0}'.format(filepath)        
-        if ext == '.fq':
-            faPipes = faPipes+' | awk \'{if(NR%4==1) {split(substr($0,2),a," "); printf(">%s\\n",a[1]);} else if(NR%4==2) print;}\''        
-        return faPipes
+        faPipe = 'cat {0}'.format(filepath)
+    faPipe = faPipe + ' | awk \'BEGIN{{RS="@";FS="\\n"}}{{if(NF>3){{printf(">%s|%d|%s|%s\\n%s\\n",$1,{0},$2,$4,$2)}};}}\''.format(flag)
+    return faPipe
+        
 
-def nhmmer(readFiles,hmmFiles,workDir,hmmerOpts,nhmmerPath = 'nhmmer', hlatoolsPath='hlatools.dll'):
-    if isinstance(readFiles,str):
-        readFiles = [readFiles]
+def nhmmer(faPipe,hmmFiles,workDir,hmmerOpts,nhmmerPath = 'nhmmer', hlatoolsPath='hlatools.dll'):
     
-    k = 0
-    faPipes = [filepath2Pipe(x) for x in set(readFiles)]
-    hmmerCmdTemplate = nhmmerPath+' {0} -o {1} {2} -';
-    hlatoolsCmdTemplate = 'dotnet {0}'.format(hlatoolsPath) +' hmmerConvert -f sam -c off -i - | samtools sort -n -o {0} -'
-
-    multiFaPipes = len(faPipes) > 1
+    hlatoolsCmdTemplate = 'dotnet {0}'.format(hlatoolsPath) +' hmmerConvert -f sam -c off -i {0} | gawk \'BEGIN{{OFS="\\t"}}{{if(!($1 ~ /^@/)){{$2=or($2,2);}}print($0);}}\' | samtools sort -n - | samtools fixmate -cm - - | samtools sort - | samtools markdup - {1}'
+    
     alignments = []
-    for fa in faPipes:
-        k=k+1
-        for hmmFilepath in hmmFiles:
-            outBamFilename = os.path.splitext(os.path.basename(hmmFilepath))[0]+'{0}.bam'.format('_{0}'.format(k) if multiFaPipes else '')
-            outTxtFilename = os.path.splitext(os.path.basename(hmmFilepath))[0]+'{0}.txt'.format('_{0}'.format(k) if multiFaPipes else '')
-            outBamFilepath = os.path.join(workDir,outBamFilename)
-            outTxtFilepath = os.path.join(workDir,outTxtFilename)
-            alignments.append(outBamFilepath)
-            cmd = '{0} | {1}'.format(fa,hmmerCmdTemplate.format(hmmerOpts,outTxtFilepath,hmmFilepath))
-            print(cmd)
-            subprocess.call(cmd, shell=True);
-            cmd = 'cat {0} | {1}'.format(outTxtFilepath,hlatoolsCmdTemplate.format(outBamFilepath))
-            print(cmd)
-            subprocess.call(cmd, shell=True);
-            os.remove(outTxtFilepath)
+    for hmmFilepath in hmmFiles:
+        outBamFilename = os.path.splitext(os.path.basename(hmmFilepath))[0]+'.bam'
+        outTxtFilename = os.path.splitext(os.path.basename(hmmFilepath))[0]+'.txt.gz'
+        outBamFilepath = os.path.join(workDir,outBamFilename)
+        outTxtFilepath = os.path.join(workDir,outTxtFilename)
+        alignments.append(outBamFilepath)
+        cmd = '{0} | {1} {2} {3} - | {4}'.format(faPipe,nhmmerPath,hmmerOpts,hmmFilepath,hlatoolsCmdTemplate.format('-', outBamFilepath))
+        print(cmd)
+        subprocess.call(cmd, shell=True)
+        #cmd = '{0} | {1} {2} {3} - | gzip > {4}'.format(faPipe,nhmmerPath,hmmerOpts,hmmFilepath,outTxtFilepath)
+        #print(cmd)
+        #subprocess.call(cmd, shell=True)
+        #cmd = hlatoolsCmdTemplate.format(outTxtFilepath, outBamFilepath)
+        #print(cmd)
+        #subprocess.call(cmd, shell=True)
+        #os.remove(outTxtFilepath)
     return alignments
 
 def main():
@@ -84,15 +59,13 @@ def main():
     parser.add_argument("-1", "--fq1", type=file_path, help="path to mate pair one fq(.gz)", action="store")
     parser.add_argument("-2", "--fq2", type=file_path, help="path to mate pair two fq(.gz)", action="store")
     parser.add_argument("-f", "--fq", type=str, help="path to unpaired fq(.gz)", action="store")
-    parser.add_argument("-a", "--fa", type=str, help="path to unpaired fa(.gz)", action="store")
-    parser.add_argument("-b", "--bam", type=str, help="path to input bam", action="store")
-    parser.add_argument("-o", "--out", help="path to output bam", action="store", type=str)
+    parser.add_argument("-o", "--out", help="path to output bam", action="store", type=str, required=True)
     parser.add_argument("-p", "--hmmerOpts", nargs='+', help="hmmer options", action="store", type=str, default=['--notextw','--nonull2','--nobias','--dna','--tformat fasta'])
     parser.add_argument("-w", "--workDir", type=str, help="path to dir where intermediate files can be written", action="store", default=os.getcwd())
     parser.add_argument("-t", "--hlatoolsPath", type=str, help="hlatools.dll filepath", action="store", default='hlatools.dll')
     parser.add_argument("-n", "--nhmmerPath", type=str, help="nhmmer filepath", action="store", default='nhmmer')
     args = parser.parse_args()
-
+    
     
     #check args and set defaults
     try:
@@ -100,64 +73,46 @@ def main():
             os.makedirs(args.workDir)
     except OSError:
         print ('Error: Could not create work directory \'{0}\' '.format(args.workDir))
-
-    if not args.out:
-        args.out = os.path.join(args.workDir,'nhmmer.bam')
-
+    
     hmmerOpts = ' '.join(args.hmmerOpts).replace('\'','')
     if args.fq1 or args.fq2:
-        if args.fq or args.bam:
+        if args.fq:
             raise ValueError('too many input types! Pleae use (--fq1 and --fq2), --fq, or --bam')
         if not (args.fq1 and args.fq2):
             raise ValueError('must specify both --fq1 and --fq2, or just --fq or --bam')
         if args.fq1 == args.fq2:
             raise ValueError('--fq1 cannot be the same file name as --fq2. Pleae use --fq for unpaired reads.')
-        readFiles = [args.fq1,args.fq2]
-    elif args.fq and args.bam:
-            raise ValueError('too many input types! Pleae use (--fq1 and --fq2), --fq, or --bam')
+        fa1Pipe = filepath2Pipe(args.fq1,65)
+        fa2Pipe = filepath2Pipe(args.fq2,129)
+        faPipe = '{{({0}) ; ({1})}}'.format(fa1Pipe,fa2Pipe)
     elif args.fq:
-        readFiles = [args.fq]
-    elif args.bam:
-        readFiles = [args.bam]
+        faPipe = filepath2Pipe(args.fq,0)
     else:
-        raise ValueError('No input reads were given to map! Please use (--fq1,fq2), --fq, or --bam')
+        raise ValueError('No input reads were given to map! Please use (--fq1,fq2), or --fq')
+    
     
     #map the reads onto the hmm from each gene of interest
-    hmmerGoiAlignments = nhmmer(readFiles, args.gois, args.workDir, hmmerOpts, args.nhmmerPath, args.hlatoolsPath)
+    hmmerGoiAlignments = nhmmer(faPipe, args.gois, args.workDir, hmmerOpts, args.nhmmerPath, args.hlatoolsPath)
     
     #build a new, smaller, fa file with only the reads that mapped onto one or more goi
     goiFaFilepath = os.path.join(args.workDir,'goi.fa.gz')
-    cmd = 'samtools cat {0} | samtools sort -n - | samtools fasta -F 0x900 - | gzip > {1}'.format(' '.join(hmmerGoiAlignments),goiFaFilepath);
+    cmd = 'samtools cat {0} | samtools view -h | gawk \'BEGIN{{OFS="\\t"}}{{if(!($1 ~ /^@/)){{$1=($1"|"and($2,193));}}print($0);}}\' | samtools sort -n - | samtools fastq -n -F 0x900 - | awk \'BEGIN{{RS="@";FS="\\n"}}{{if(NF>3){{printf(">%s|%s|%s\\n%s\\n",$1,$2,$4,$2)}};}}\' | gzip > {1}'.format(' '.join(hmmerGoiAlignments),goiFaFilepath);
     print(cmd)
     subprocess.call(cmd, shell=True);
     
     #map the reads in goi.fa.gz onto the decoys
-    hmmerDecoyAlignments = nhmmer(goiFaFilepath, args.decoys, args.workDir, hmmerOpts, args.nhmmerPath, args.hlatoolsPath)
+    hmmerDecoyAlignments = nhmmer('gzip -cdk {0}'.format(goiFaFilepath), args.decoys, args.workDir, hmmerOpts, args.nhmmerPath, args.hlatoolsPath)
     
-    #re-attach mate info from input file(s), and fix mates
-    mateAwk = 'gawk \'BEGIN{OFS="\\t"}{if(!($1 ~ /^@/)){split($1,a,"|");$1=a[1];$2=or(or($2,a[2]),2);print($0);} else print}\''
+    #output the final, merged, bam file
     allBams = hmmerGoiAlignments + hmmerDecoyAlignments
-    mfBams = []
-    for bam in allBams:
-        mfFilepath = bam.replace('.bam', '_MatesFixed.bam')
-        mfBams.append(mfFilepath)
-        cmd = 'samtools view -h {0} | {1} | samtools view -bh | samtools sort -n - | samtools fixmate -m - {2}'.format(bam,mateAwk,mfFilepath)
-        print(cmd)
-        subprocess.call(cmd, shell=True);
-    
-    #output the final bam file (sorted by read name)
-    cmd = 'samtools cat {0} | samtools sort -n -o {1} -'.format(' '.join(mfBams),args.out)
+    cmd = 'samtools merge {0} {1}'.format(args.out, ' '.join(allBams))
     print(cmd)
     subprocess.call(cmd, shell=True);
     
     #clean-up intermediate files
-    #os.remove(goiFaFilepath)
-    #for f in hmmerGoiAlignments:
-    #    os.remove(f)
-    #for f in hmmerDecoyAlignments:
-    #    os.remove(f)
-    #for f in mfBams:
-    #    os.remove(f)
+    os.remove(goiFaFilepath)
+    for f in allBams:
+        os.remove(f)
 
 if __name__ == '__main__':
     main()
