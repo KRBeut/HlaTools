@@ -29,13 +29,14 @@ def bam2fagz(bamFilepath, fagzFilepath):
     if isinstance(bamFilepath, str):
         bamFilepath = [bamFilepath]
     collatePrefix = os.path.join(os.path.dirname(fagzFilepath),os.path.splitext(os.path.basename(fagzFilepath))[0]+'tmpBam2FagzCollate')
-    cmd = 'samtools cat {0} | samtools view -h | gawk \'BEGIN{{OFS="\\t"}}{{if(!($1 ~ /^@/)){{$1=($1"|"or(3,and($2,704)));}}print($0);}}\' | samtools collate -O - {1} | samtools fastq -n -F 0x900 - | awk \'BEGIN{{RS="@";FS="\\n"}}{{if(NF>3){{printf(">%s|%s|%s\\n%s\\n",$1,$2,$4,$2)}};}}\' | gzip > {2}'.format(' '.join(bamFilepath),collatePrefix,fagzFilepath)
+    #cmd = 'samtools cat {0} | samtools view -h | gawk \'BEGIN{{OFS="\\t"}}{{if(!($1 ~ /^@/)){{$1=($1"|"or(3,and($2,704)));}}print($0);}}\' | samtools collate -O - {1} | samtools fastq -n -F 0x900 - | awk \'BEGIN{{RS="@";FS="\\n"}}{{if(NF>3){{printf(">%s|%s|%s\\n%s\\n",$1,$2,$4,$2)}};}}\' | gzip > {2}'.format(' '.join(bamFilepath),collatePrefix,fagzFilepath)
+    cmd = 'samtools cat {0} | samtools view -h | gawk \'BEGIN{{OFS="\\t"}}{{if(!($1 ~ /^@/)){{$1=($1"|"or(3,and($2,704)));}}print($0);}}\' | samtools collate -O - {1} | samtools fastq -n -F 0x900 - | awk \'BEGIN{{RS="\\n";FS="\\n";ORS=""}}{{if(NR%4==1){{printf(">%s",substr($0,2))}}else if(NR%4==2){{printf("|%s",$0)}}else if(NR%4==0){{printf("|%s\\n",$0)}}}}\' | awk \'BEGIN{{RS="\\n"}}{{split($0,a,"|");printf("%s\n%s\n",$0,a[3])}}\' | gzip > {2}'.format(' '.join(bamFilepath),collatePrefix,fagzFilepath)
     print(cmd)
     subprocess.call(cmd, shell=True)
 
 def nhmmer(faPipe,hmmFiles,workDir,hmmerOpts,nhmmerPath = 'nhmmer', hlatoolsPath='hlatools.dll'):
     
-    hlatoolsCmdTemplate = 'dotnet {0}'.format(hlatoolsPath) +' hmmerConvert -f sam -c off -i {0} | samtools collate -O - {1} | samtools fixmate -cm - - | samtools sort - | samtools markdup - {2}'
+    hlatoolsCmdTemplate = 'dotnet {0}'.format(hlatoolsPath) +' hmmerConvert -f sam -c off -i {0} | samtools view -bh -q 90 - | samtools collate -O - {1} | samtools fixmate -cm - - | samtools view -bh -f 2 | samtools sort - | samtools markdup - {2}'
     
     alignments = []
     for hmmFilepath in hmmFiles:
@@ -127,11 +128,11 @@ def main():
     subprocess.call(cmd, shell=True);
     
     #clean-up intermediate files
-    os.remove(goiFagzFilepath)
+    #os.remove(goiFagzFilepath)
     for f in allBams:
         os.remove(f)
-    if fagzFilepath:
-        os.remove(fagzFilepath)
+    #if fagzFilepath:
+    #    os.remove(fagzFilepath)
 
 if __name__ == '__main__':
     main()
