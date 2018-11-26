@@ -53,89 +53,94 @@ namespace hlatools.core
             }
             inputKvps.Remove("input");
             inputKvps.Remove("i");
-            
+
+            int tol = 0;
+            if (inputKvps.TryGetValue("tol", out string tolStr) || inputKvps.TryGetValue("t", out tolStr))
+            {
+                if (!int.TryParse(tolStr, out tol))
+                {
+                    Console.Error.WriteLine("WARNING: invalide tol value, \"{0}\". Defaulting to 0", tolStr);
+                }
+            }
+            tol = Math.Abs(tol);
+            inputKvps.Remove("tol");
+            inputKvps.Remove("t");
+
             using (var outputStrm = GetOutputStream(outputPath))
             using (var outStrmWrtr = new StreamWriter(outputStrm))
+            using (var bamPrsr = GetInputParser(inputPath))
             {
-                var reads = GetInputRead(inputPath).ToList();
-                reads = AssignXLocusReads(reads).ToList();
-                SamWriter.WriteToFile(outStrmWrtr, reads);
+                var samHdr = bamPrsr.Header;
+                var reads = RemoveXLocusReads(bamPrsr.GetRecords(), tol);
+                SamWriter.WriteToFile(outStrmWrtr, samHdr, reads);
             }
-            
             return string.Empty;
         }
 
-        protected IEnumerable<SamSeq> AssignXLocusReads(IEnumerable<SamSeq> allReads)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="allReads"></param>
+        /// <param name="tol">All read pairs with combined mapping score within tol of the max mapping score will be returned</param>
+        /// <returns></returns>
+        protected IEnumerable<SamSeq> RemoveXLocusReads(IEnumerable<SamSeq> allReads, int tol)
         {
-            //Special (optional) logic to convert the read groups to the locus 
-            //names so that we can see the read group coverage more clearly . . .
-            //foreach (var rd in allReads)
-            //{
-            //    rd.Rname = rd.ReadGroup;
-            //}
-
-            //assign reads to locus based on HN (normalized hmmer score)
-            //allReads = allReads.Where(r => (r.Opts["HN"] as SamSeqFloatOpt).Value >= 0.80F).ToList();
-            allReads = allReads.GroupBy(r => r.Qname)
-                               .SelectMany(g => 
-                               {
-                                   var M = g.Max(r => -(r.Opts["HN"] as SamSeqFloatOpt).Value);
-                                   return g.Where(r => -(r.Opts["HN"] as SamSeqFloatOpt).Value == M);
-                               })
-                               .ToList();
-            
-            //write the alignments to the sam file
-            var xLocReadAssigner = new CrossLocusReadAssigner();
-            var xLocReadInfo = xLocReadAssigner.GatherCrossLocusReads(allReads);
-            var readGroups = xLocReadAssigner.AssignCrossLocusReads(allReads, xLocReadInfo);
-
-            return allReads;
+            var wlkr = new ReadNameWalker(allReads);
+            foreach (var readGroup in wlkr.ReadSets())
+            {
+                var readPairs = ReadPairUtils.PairReads(readGroup).ToList();
+                if (readPairs.Count < 1)
+                {
+                    continue;
+                }
+                if (readPairs.Count == 1)
+                {
+                    var p = readPairs.First();
+                    yield return p.ReadOne;
+                    yield return p.ReadTwo;
+                }
+                else
+                {
+                    var maxPairScore = readPairs.Max(p => ScoreReadPair(p));
+                    var bestReadPairs = readPairs.Where(p => ScoreReadPair(p) >= maxPairScore - tol).ToList();
+                    if (bestReadPairs.Count > 1)
+                    {
+                        continue;
+                    }
+                    foreach (var bestPair in bestReadPairs)
+                    {
+                        yield return bestPair.ReadOne;
+                        yield return bestPair.ReadTwo;
+                    }
+                }
+            }
+            yield break;
         }
 
-        protected IEnumerable<SamSeq> GetInputRead(string input)
+        protected double ScoreReadPair(ReadPair p)
+        {
+            return (double)(p.ReadOne.Mapq + p.ReadTwo.Mapq);
+            //return 1.0/(double)((p.ReadOne.Opts["HE"] as SamSeqFloatOpt).Value + (p.ReadTwo.Opts["HE"] as SamSeqFloatOpt).Value);
+        }
+
+        protected BamParser GetInputParser(string input)
         {
             var inputFileExtension = Path.GetExtension(input);
-            if (input == "sam" || inputFileExtension == ".sam")
+            Stream strm;
+            if (input == "bam")
             {
-                Stream strm;
-                if (input == "sam")
-                {
-                    strm = Console.OpenStandardInput();
-                }
-                else
-                {
-                    strm = File.Open(input, FileMode.Open, FileAccess.Read, FileShare.Read);
-                }                
-                using (var strmRdr = new StreamReader(strm))
-                using (var samPrsr = new SamParser(strmRdr, () => new SamSeq()))
-                {
-                    foreach (var read in samPrsr.GetRecords())
-                    {
-                        yield return read;
-                    }
-                }
+                strm = Console.OpenStandardInput();
             }
-            else if (input == "bam" || inputFileExtension == ".bam")
+            else
             {
-                Stream strm;
-                if (input == "bam")
-                {
-                    strm = Console.OpenStandardInput();
-                }
-                else
-                {
-                    strm = File.Open(input, FileMode.Open, FileAccess.Read, FileShare.Read);
-                }
-                                
-                using (var strmRdr = new BinaryReader(strm))
-                using (var bamPrsr = new BamParser(strmRdr, () => new SamSeq()))
-                {
-                    foreach (var read in bamPrsr.GetRecords())
-                    {
-                        yield return read;
-                    }
-                }
+                strm = File.Open(input, FileMode.Open, FileAccess.Read, FileShare.Read);
             }
+
+            var strmRdr = new BinaryReader(strm);
+            
+            var bgzfStrm = new BgzfReader(strm);
+            var bamPrsr = new BamParser(bgzfStrm, ()=>new SamSeq());
+            return bamPrsr;
         }
 
         protected Stream GetOutputStream(string output)

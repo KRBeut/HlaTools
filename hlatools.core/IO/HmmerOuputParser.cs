@@ -256,7 +256,7 @@ namespace hlatools.core.IO
             }
             if (qNameToks.Length > 3 && qNameToks[3] != "*")
             {
-                read.Qual = qNameToks[3];
+                read.Qual = string.Join("",qNameToks.Skip(3));// in the unlikely event that qual contains a "|"
                 if (read.Flag.HasFlag(SamFlag.REVERSESEQ))
                 {
                     read.Qual = new String(read.Qual.Reverse().ToArray());

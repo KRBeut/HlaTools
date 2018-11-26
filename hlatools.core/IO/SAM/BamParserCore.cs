@@ -60,20 +60,23 @@ namespace hlatools.core.IO.SAM
             var samHdr = new H();
             var magic = binRdr.ReadChars(4);
 
-            if (!(magic[0] == 'B' && magic[1] == 'A' && magic[2] == 'M') && magic[3] == 1)
+            if (magic[0] != 'B' || magic[1] != 'A' || magic[2] != 'M' || magic[3] != 1)
             {
                 throw new Exception(string.Format("Invalid BAM binary header, Magic = {0} (this is not a BAM file).", string.Join("",magic)));
             }
 
             var l_text = binRdr.ReadInt32();
-            var headerTxt = new String(binRdr.ReadChars(l_text));
-            var text = headerTxt.Split(new char[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
-            foreach (var hdrLine in text)
+            if (l_text > 0)
             {
-                SamParserCore<S, H>.ParseHeaderLine(samHdr, hdrLine);
+                var headerTxt = new String(binRdr.ReadChars(l_text));
+                var text = headerTxt.Split(new char[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (var hdrLine in text)
+                {
+                    SamParserCore<S, H>.ParseHeaderLine(samHdr, hdrLine);
+                }
+                var intToRefSa = samHdr.SQ.Values.ToDictionary(sq => sq.SortIndex, sq => sq);
+                samHdr.IntToRefSeq = intToRefSa;
             }
-            var intToRefSa = samHdr.SQ.Values.ToDictionary(sq => sq.SortIndex, sq => sq);
-            samHdr.IntToRefSeq = intToRefSa;
 
             var n_ref = binRdr.ReadInt32();
             for(int k = 0; k < n_ref; k++)
